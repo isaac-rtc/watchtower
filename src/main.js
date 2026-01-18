@@ -4,105 +4,104 @@ import './style.css'
 const ERROR_LENGTH_THRESHOLD = 250
 
 document.querySelector('#app').innerHTML = `
-  <div class="app-grid">
-    <!-- LEFT: Watch Tower -->
-    <div class="container">
-      <h3 class="title">Watch Tower</h3>
+  <!-- 1. Navbar -->
+  <header class="navbar">
+    <div class="brand">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"></circle>
+        <circle cx="12" cy="12" r="3"></circle>
+      </svg>
+      Watch Tower
+    </div>
+    <div class="status-badge" id="status-badge">
+      <div class="status-dot"></div>
+      <span id="status-text">Idle</span>
+    </div>
+  </header>
 
-      <div class="controls">
-        <input id="file" type="file" accept="video/*" />
-        <button id="start">Start</button>
-        <button id="stop" disabled>Stop</button>
-      </div>
-
-      <h4>Error Stream</h4>
-      <div class="output-slot">
-        <pre id="output">Waiting for output…</pre>
+  <!-- 2. Workspace -->
+  <div class="workspace">
+    <!-- Left: Live Session -->
+    <div class="panel-left">
+      <video id="preview" autoplay muted playsinline></video>
+      
+      <!-- Action Overlay -->
+      <div class="action-overlay">
+        <button id="start-btn" class="btn-primary">Start Session</button>
+        <button id="stop-btn" class="btn-primary btn-danger hidden" style="display:none">Stop Session</button>
       </div>
     </div>
 
-    <!-- RIGHT: Token Company -->
-<div class="container secondary">
-  <h3 class="title">Token Compression</h3>
+    <!-- Right: Intelligence -->
+    <div class="panel-right">
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="stream">Live Stream</button>
+        <button class="tab-btn" data-tab="compression">Compression</button>
+      </div>
 
-  <div class="controls">
-    <button id="compress" disabled>Compress</button>
-    <button id="copy" disabled>Copy</button>
-  </div>
+      <!-- Tab: Live Stream -->
+      <div id="tab-stream" class="tab-content active">
+        <div class="log-container">
+            <div id="output">Waiting for session start...</div>
+        </div>
+      </div>
 
-  <h4>Captured Error</h4>
-
-  <div id="token-meta" class="token-meta hidden"></div>
-
-  <div class="output-slot">
-    <pre id="final-output">No error captured yet.</pre>
-  </div>
-</div>
-
-
-  <!-- Popup -->
-  <div id="done-modal" class="modal hidden">
-    <div class="modal-content">
-      <h3>ERROR STREAM CAUGHT</h3>
-      <p>A full error has been detected and locked.</p>
-      <button id="close-modal">Continue</button>
+      <!-- Tab: Compression -->
+      <div id="tab-compression" class="tab-content">
+        <div class="compression-view">
+           <div id="token-stats" class="token-stats hidden">
+              <!-- Injected via JS -->
+           </div>
+           
+           <div class="prompt-area" id="final-output">No data captured yet.</div>
+           
+           <div class="copy-feedback" id="copy-feedback"></div>
+           
+           <button id="compress-btn" class="btn-block" disabled>Compress & Copy Prompt</button>
+        </div>
+      </div>
     </div>
   </div>
 `
 
-const fileInput = document.getElementById('file')
-const startBtn = document.getElementById('start')
-const stopBtn = document.getElementById('stop')
-const compressBtn = document.getElementById('compress')
-const copyBtn = document.getElementById('copy')
+// --- DOM CONSTANTS ---
+const startBtn = document.getElementById('start-btn')
+const stopBtn = document.getElementById('stop-btn')
+const compressBtn = document.getElementById('compress-btn')
 
-const outputEl = document.getElementById('output')
-const finalOutputEl = document.getElementById('final-output')
+const outputEl = document.getElementById('output') // Log container
+const finalOutputEl = document.getElementById('final-output') // Compression result area
+const previewEl = document.getElementById('preview')
 
-const modal = document.getElementById('done-modal')
-const closeModalBtn = document.getElementById('close-modal')
+const statusBadge = document.getElementById('status-badge')
+const statusText = document.getElementById('status-text')
+const tokenStatsEl = document.getElementById('token-stats')
+const copyFeedbackEl = document.getElementById('copy-feedback')
 
-let videoFile = null
 let vision = null
 let finalized = false
 let bestOutput = ''
 let compressedOutput = ''
+let lastDetectedText = ''
 
-fileInput.addEventListener('change', () => {
-  videoFile = fileInput.files[0]
+// Tab Logic
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    // 1. Remove active class from all buttons and contents
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'))
+
+    // 2. Activate clicked
+    btn.classList.add('active')
+    document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active')
+  })
 })
 
-function showPopup() {
-  modal.classList.remove('hidden')
-}
-
-closeModalBtn.addEventListener('click', () => {
-  modal.classList.add('hidden')
-})
-
-function finalizeError(errorText) {
-  if (finalized) return
-  finalized = true
-
-  bestOutput = errorText
-  outputEl.textContent = errorText
-  finalOutputEl.textContent = errorText
-
-  compressBtn.disabled = false
-  copyBtn.disabled = true
-
-  if (vision) {
-    vision.stop()
-    vision = null
-  }
-
-  startBtn.disabled = false
-  stopBtn.disabled = true
-
-  showPopup()
-}
 
 async function compressWithTokenCompany(text) {
+  console.log('Attemping compression with key:', import.meta.env.VITE_TOKENCOMPANY_API_KEY ? 'FOUND' : 'MISSING')
+
   const response = await fetch('https://api.thetokencompany.com/v1/compress', {
     method: 'POST',
     headers: {
@@ -138,117 +137,222 @@ function renderTokenMeta(meta) {
     ((original_input_tokens - output_tokens) / original_input_tokens) * 100
   )
 
-  const metaEl = document.getElementById('token-meta')
-
-  metaEl.innerHTML = `
-    <div class="token-row">
-      <span>Tokens</span>
-      <span>${original_input_tokens} → ${output_tokens}</span>
+  tokenStatsEl.innerHTML = `
+    <div class="stat-row">
+      <span>Original Tokens</span>
+      <span class="stat-value">${original_input_tokens}</span>
     </div>
-
-    <div class="token-row">
+    <div class="stat-row">
+      <span>Compressed</span>
+      <span class="stat-value">${output_tokens}</span>
+    </div>
+    <div class="stat-row" style="color:var(--status-green)">
       <span>Reduction</span>
-      <span>${reductionPercent}%</span>
+      <span class="stat-value">${reductionPercent}%</span>
     </div>
 
-    <div class="token-bar">
-      <div class="token-bar-fill" style="width: ${reductionPercent}%"></div>
-    </div>
-
-    <div class="token-hint">
-      Compression time: ${compression_time.toFixed(2)}s
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" style="width: ${reductionPercent}%"></div>
     </div>
   `
-
-  metaEl.classList.remove('hidden')
+  tokenStatsEl.classList.remove('hidden')
 }
 
 
+
 startBtn.addEventListener('click', async () => {
-  if (!videoFile) return
+  try {
+    // 1. Get Screen Stream (Constrained to 1080p to ensure readable text size/bandwidth)
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: {
+        width: { ideal: 1920, max: 1920 },
+        height: { ideal: 1080, max: 1080 },
+        frameRate: { ideal: 24, max: 30 },
+        cursor: "always"
+      },
+      audio: false
+    })
 
-  finalized = false
-  bestOutput = ''
-  compressedOutput = ''
+    // Show preview
+    previewEl.srcObject = stream
 
-  outputEl.textContent = 'Analyzing…'
-  finalOutputEl.textContent = 'No error captured yet.'
+    // DIAGNOSTICS: Check what we are actually sending
+    const track = stream.getVideoTracks()[0]
+    const settings = track.getSettings()
+    const diagMsg = `[System] Stream Active: ${settings.width}x${settings.height} @ ${settings.frameRate?.toFixed(1) || '?'} fps`
+    console.log(diagMsg)
+    outputEl.textContent = `${diagMsg}\nWaiting for AI response...`
 
-  compressBtn.disabled = true
-  copyBtn.disabled = true
-  modal.classList.add('hidden')
+    // Handle user stopping stream via browser UI
+    track.onended = () => {
+      stopBtn.click()
+    }
 
-  vision = new RealtimeVision({
-    apiUrl: import.meta.env.VITE_OVERSHOOT_API_URL,
-    apiKey: import.meta.env.VITE_OVERSHOOT_API_KEY,
+    finalized = false
+    bestOutput = ''
+    lastDetectedText = ''
+    compressedOutput = ''
 
-    prompt: `
-You are analyzing a screen recording of a computer display.
+    outputEl.textContent = 'Watching screen…'
+    finalOutputEl.textContent = 'No error captured yet.'
 
-Detect and extract any visible error messages from the screen.
+    compressBtn.disabled = true
 
-Errors may include:
-- Console errors
-- Runtime exceptions
-- Stack traces
-- Any text indicating failure or invalid behavior
+    // 2. Intercept getUserMedia - Return the raw screen stream directly
+    const originalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices)
+    navigator.mediaDevices.getUserMedia = async () => {
+      // The SDK expects a stream, so we give it our screen stream.
+      return stream
+    }
 
-Output rules:
-- If an error is visible, extract the FULL error text.
-- Preserve formatting.
-- Do NOT explain or summarize.
-- Do NOT add extra text.
+    // 3. Init Vision
+    vision = new RealtimeVision({
+      apiUrl: import.meta.env.VITE_OVERSHOOT_API_URL,
+      apiKey: import.meta.env.VITE_OVERSHOOT_API_KEY,
 
-If no error is visible, output exactly:
-Still parsing!
-    `,
+      prompt: "EXTRACT ALL VISIBLE ERROR TEXT, STACK TRACES, AND LOGS. COPY THEM EXACTLY. DO NOT SUMMARIZE.",
 
-    source: {
-      type: 'video',
-      file: videoFile,
-    },
+      source: {
+        type: 'camera',
+        cameraFacing: 'environment',
+      },
 
-    processing: {
-      clip_length_seconds: 1.5,
-      delay_seconds: 1.5,
-      fps: 30,
-      sampling_ratio: 0.75,
-    },
+      debug: true,
 
-    onResult: (result) => {
-      console.log('[Overshoot] frame window processed')
-      if (finalized || !result?.result) return
+      processing: {
+        clip_length_seconds: 2,
+        delay_seconds: 1,
+        fps: 5,
+        sampling_ratio: 1,
+      },
 
-      const text = result.result.trim()
-      
+      onResult: (result) => {
+        console.log('[Overshoot] result:', result)
+        if (finalized || !result?.result) return
 
-      if (text === 'NO_ERROR') return
+        const text = result.result.trim()
 
-      outputEl.textContent = text
+        // IGNORE negative phrases
+        const ignoredPhrases = [
+          'NO_ERROR',
+          'Still parsing!',
+          'No visible error',
+          'No visible error text'
+        ]
+        const isIgnored = ignoredPhrases.some(phrase => text.includes(phrase))
 
-      if (text.length >= ERROR_LENGTH_THRESHOLD) {
-        finalizeError(text)
-      }
-    },
-  })
+        // DEBUG LOG always to console, but update UI smartly
+        if (!isIgnored) {
+          // LIVE UPDATE: Show the user whatever we see right now
+          outputEl.textContent = text
 
-  await vision.start()
-  console.log('[Overshoot] started watching video frames')
-  startBtn.disabled = true
-  stopBtn.disabled = false
+          // Keep the longest/"best" capture for the compression button
+          if (text.length > bestOutput.length) {
+            bestOutput = text
+            console.log('New best output saved:', bestOutput.length)
+          }
+          lastDetectedText = text
+        } else {
+          // SHOW ALIVENESS: If we ignore the text, at least tell the user we are scanning
+          // But don't overwrite if we already have good text?
+          // Actually, if it goes from "Error" to "No Error", we might want to keep the error visible?
+          // The user wants "Live" feeling. 
+
+          // If we haven't found anything good yet, say Scanning.
+          if (bestOutput.length === 0) {
+            outputEl.textContent = `Scanning... [${new Date().toLocaleTimeString()}]\n(No error detected yet)`
+          }
+        }
+      },
+    })
+
+    // 4. Start Vision (this calls the hijacked getUserMedia)
+    await vision.start()
+
+    // 5. Restore original getUserMedia
+    navigator.mediaDevices.getUserMedia = originalGetUserMedia
+
+    console.log('[Overshoot] started watching screen stream')
+
+    // UI Updates
+    startBtn.style.display = 'none'
+    stopBtn.style.display = 'block'
+    stopBtn.disabled = false
+    stopBtn.classList.remove('hidden')
+
+    previewEl.classList.add('active')
+    statusBadge.classList.add('active')
+    statusText.textContent = 'Recording'
+
+  } catch (err) {
+    console.error('Failed to start screen share:', err)
+    outputEl.textContent = `Failed to start: ${err.message || err}`
+  }
 })
 
 stopBtn.addEventListener('click', () => {
-  if (bestOutput.length > 0) {
-    finalizeError(bestOutput)
-  } else {
-    finalized = true
-    if (vision) vision.stop()
-    vision = null
-    startBtn.disabled = false
-    stopBtn.disabled = true
+  if (finalized) return
+
+  finalized = true
+  if (vision) vision.stop()
+  vision = null
+
+  startBtn.style.display = 'block'
+  startBtn.disabled = false
+
+  stopBtn.style.display = 'none'
+  stopBtn.disabled = true
+
+  statusBadge.classList.remove('active')
+  statusText.textContent = 'Error Captured'
+  previewEl.classList.remove('active')
+
+  // Decide what to put in "Captured Error" slot
+  // Prefer Best (Longest) Output, fallback to Last Seen
+  const textToCapture = bestOutput || lastDetectedText || "No error detected."
+
+  outputEl.textContent = textToCapture  // Keep log visible
+  finalOutputEl.textContent = textToCapture // Prep compression input
+
+  if (textToCapture.length > 10 && textToCapture !== "No error detected.") {
+    compressBtn.disabled = false
+    // Auto-switch tab to highlight next step? Maybe
+    document.querySelector('[data-tab="compression"]').click()
   }
 })
+
+// Helper to lock in the error state
+function finalizeError(errorText) {
+  if (finalized) return
+  finalized = true
+
+  bestOutput = errorText
+  outputEl.textContent = errorText
+  finalOutputEl.textContent = errorText
+
+  compressBtn.disabled = false
+
+  if (vision) {
+    vision.stop()
+    vision = null
+  }
+
+  // Clear preview
+  previewEl.srcObject = null
+
+  startBtn.style.display = 'block'
+  startBtn.disabled = false
+
+  stopBtn.style.display = 'none'
+  stopBtn.disabled = true
+
+  statusBadge.classList.remove('active')
+  statusText.textContent = 'Error Captured'
+  previewEl.classList.remove('active')
+
+  // Auto-switch tab to highlight next step
+  document.querySelector('[data-tab="compression"]').click()
+}
 
 compressBtn.addEventListener('click', async () => {
   compressBtn.disabled = true
@@ -257,24 +361,31 @@ compressBtn.addEventListener('click', async () => {
   try {
     const result = await compressWithTokenCompany(bestOutput)
 
-    compressedOutput = result.output
+    const compressedLog = result.output // The raw compressed text
+
+    // Construct the final prompt for the user
+    compressedOutput = `I am debugging an issue in my application. Here is the compressed error log and stack trace. Please analyze it and identify the root cause:\n\n${compressedLog}`
+
     finalOutputEl.textContent = compressedOutput
 
     renderTokenMeta(result)
 
 
     await navigator.clipboard.writeText(compressedOutput)
-    copyBtn.disabled = false
-    copyBtn.textContent = 'Copied'
+
+    compressBtn.textContent = 'Copied to Clipboard!'
+    compressBtn.disabled = false
+    copyFeedbackEl.textContent = 'Prompt ready for LLM.'
+
+    setTimeout(() => {
+      compressBtn.textContent = 'Compress & Copy Prompt'
+      copyFeedbackEl.textContent = ''
+    }, 3000)
 
   } catch (err) {
     finalOutputEl.textContent = 'Compression failed.'
     console.error(err)
+    compressBtn.disabled = false
+    compressBtn.textContent = 'Retry Compression'
   }
-})
-
-copyBtn.addEventListener('click', async () => {
-  if (!compressedOutput) return
-  await navigator.clipboard.writeText(compressedOutput)
-  copyBtn.textContent = 'Copied'
 })
