@@ -137,3 +137,45 @@ pre {
   margin-top: 0;
   color: #C1121F;
 }
+
+/* Token Company Meta UI */
+.token-meta {
+  margin-bottom: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #F1FAEE;
+  color: #1D3557;
+  font-size: 14px;
+}
+
+.token-meta.hidden {
+  display: none;
+}
+
+.token-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.token-bar {
+  height: 10px;
+  border-radius: 6px;
+  background: #E5E5E5;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.token-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #FFD166, #C1121F);
+  width: 0%;
+  transition: width 0.4s ease;
+}
+
+.token-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.8;
+}

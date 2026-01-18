@@ -112,7 +112,7 @@ async function compressWithTokenCompany(text) {
     body: JSON.stringify({
       model: 'bear-1',
       compression_settings: {
-        aggressiveness: 0.5,
+        aggressiveness: 0.85,
         max_output_tokens: null,
         min_output_tokens: null
       },
@@ -126,6 +126,43 @@ async function compressWithTokenCompany(text) {
 
   return response.json()
 }
+
+function renderTokenMeta(meta) {
+  const {
+    original_input_tokens,
+    output_tokens,
+    compression_time,
+  } = meta
+
+  const reductionPercent = Math.round(
+    ((original_input_tokens - output_tokens) / original_input_tokens) * 100
+  )
+
+  const metaEl = document.getElementById('token-meta')
+
+  metaEl.innerHTML = `
+    <div class="token-row">
+      <span>Tokens</span>
+      <span>${original_input_tokens} → ${output_tokens}</span>
+    </div>
+
+    <div class="token-row">
+      <span>Reduction</span>
+      <span>${reductionPercent}%</span>
+    </div>
+
+    <div class="token-bar">
+      <div class="token-bar-fill" style="width: ${reductionPercent}%"></div>
+    </div>
+
+    <div class="token-hint">
+      Compression time: ${compression_time.toFixed(2)}s
+    </div>
+  `
+
+  metaEl.classList.remove('hidden')
+}
+
 
 startBtn.addEventListener('click', async () => {
   if (!videoFile) return
@@ -179,9 +216,12 @@ NO_ERROR
     },
 
     onResult: (result) => {
+      console.log('[Overshoot] frame window processed')
       if (finalized || !result?.result) return
 
       const text = result.result.trim()
+      
+
       if (text === 'NO_ERROR') return
 
       outputEl.textContent = text
@@ -193,6 +233,7 @@ NO_ERROR
   })
 
   await vision.start()
+  console.log('[Overshoot] started watching video frames')
   startBtn.disabled = true
   stopBtn.disabled = false
 })
@@ -215,9 +256,12 @@ compressBtn.addEventListener('click', async () => {
 
   try {
     const result = await compressWithTokenCompany(bestOutput)
-    compressedOutput = result.output
 
+    compressedOutput = result.output
     finalOutputEl.textContent = compressedOutput
+
+    renderTokenMeta(result)
+
 
     await navigator.clipboard.writeText(compressedOutput)
     copyBtn.disabled = false
