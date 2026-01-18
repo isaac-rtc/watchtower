@@ -210,9 +210,9 @@ Still parsing!
 
     processing: {
       clip_length_seconds: 1.5,
-      delay_seconds: 1.5,
+      delay_seconds: 1,
       fps: 30,
-      sampling_ratio: 0.75,
+      sampling_ratio: 0.45,
     },
 
     onResult: (result) => {
