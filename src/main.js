@@ -3,6 +3,26 @@ import './style.css'
 
 const ERROR_LENGTH_THRESHOLD = 250
 
+// -----------------------------
+// UI only: theme toggle (does not touch app logic)
+// -----------------------------
+const root = document.documentElement
+const savedTheme = localStorage.getItem('wt-theme')
+if (savedTheme) root.dataset.theme = savedTheme
+
+const themeBtn = document.createElement('button')
+themeBtn.id = 'theme-toggle'
+themeBtn.type = 'button'
+themeBtn.textContent = root.dataset.theme === 'dark' ? 'Dark' : 'Light'
+document.body.appendChild(themeBtn)
+
+themeBtn.addEventListener('click', () => {
+  const next = root.dataset.theme === 'dark' ? 'light' : 'dark'
+  root.dataset.theme = next
+  localStorage.setItem('wt-theme', next)
+  themeBtn.textContent = next === 'dark' ? 'Dark' : 'Light'
+})
+
 document.querySelector('#app').innerHTML = `
   <div class="app-grid">
     <!-- LEFT: Watch Tower -->
@@ -22,23 +42,23 @@ document.querySelector('#app').innerHTML = `
     </div>
 
     <!-- RIGHT: Token Company -->
-<div class="container secondary">
-  <h3 class="title">Token Compression</h3>
+    <div class="container secondary">
+      <h3 class="title">Token Compression</h3>
 
-  <div class="controls">
-    <button id="compress" disabled>Compress</button>
-    <button id="copy" disabled>Copy</button>
+      <div class="controls">
+        <button id="compress" disabled>Compress</button>
+        <button id="copy" disabled>Copy</button>
+      </div>
+
+      <h4>Captured Error</h4>
+
+      <div id="token-meta" class="token-meta hidden"></div>
+
+      <div class="output-slot">
+        <pre id="final-output">No error captured yet.</pre>
+      </div>
+    </div>
   </div>
-
-  <h4>Captured Error</h4>
-
-  <div id="token-meta" class="token-meta hidden"></div>
-
-  <div class="output-slot">
-    <pre id="final-output">No error captured yet.</pre>
-  </div>
-</div>
-
 
   <!-- Popup -->
   <div id="done-modal" class="modal hidden">
@@ -86,6 +106,7 @@ function finalizeError(errorText) {
 
   bestOutput = errorText
   outputEl.textContent = errorText
+  outputEl.classList.remove('processing')
   finalOutputEl.textContent = errorText
 
   compressBtn.disabled = false
@@ -163,7 +184,6 @@ function renderTokenMeta(meta) {
   metaEl.classList.remove('hidden')
 }
 
-
 startBtn.addEventListener('click', async () => {
   if (!videoFile) return
 
@@ -172,11 +192,17 @@ startBtn.addEventListener('click', async () => {
   compressedOutput = ''
 
   outputEl.textContent = 'Analyzing…'
+  outputEl.classList.add('processing')
   finalOutputEl.textContent = 'No error captured yet.'
 
   compressBtn.disabled = true
   copyBtn.disabled = true
   modal.classList.add('hidden')
+
+  // UI only: hide previous meta panel when restarting
+  const metaEl = document.getElementById('token-meta')
+  metaEl.classList.add('hidden')
+  metaEl.innerHTML = ''
 
   vision = new RealtimeVision({
     apiUrl: import.meta.env.VITE_OVERSHOOT_API_URL,
@@ -220,11 +246,11 @@ Still parsing!
       if (finalized || !result?.result) return
 
       const text = result.result.trim()
-      
 
       if (text === 'NO_ERROR') return
 
       outputEl.textContent = text
+      outputEl.classList.remove('processing')
 
       if (text.length >= ERROR_LENGTH_THRESHOLD) {
         finalizeError(text)
@@ -247,21 +273,23 @@ stopBtn.addEventListener('click', () => {
     vision = null
     startBtn.disabled = false
     stopBtn.disabled = true
+    outputEl.classList.remove('processing')
   }
 })
 
 compressBtn.addEventListener('click', async () => {
   compressBtn.disabled = true
   finalOutputEl.textContent = 'Compressing…'
+  finalOutputEl.classList.add('processing')
 
   try {
     const result = await compressWithTokenCompany(bestOutput)
 
     compressedOutput = result.output
     finalOutputEl.textContent = compressedOutput
+    finalOutputEl.classList.remove('processing')
 
     renderTokenMeta(result)
-
 
     await navigator.clipboard.writeText(compressedOutput)
     copyBtn.disabled = false
@@ -269,6 +297,7 @@ compressBtn.addEventListener('click', async () => {
 
   } catch (err) {
     finalOutputEl.textContent = 'Compression failed.'
+    finalOutputEl.classList.remove('processing')
     console.error(err)
   }
 })
