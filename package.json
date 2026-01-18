@@ -10,5 +10,8 @@
   },
   "devDependencies": {
     "vite": "^7.2.4"
+  },
+  "dependencies": {
+    "@overshoot/sdk": "^0.1.0-alpha.2"
   }
 }
