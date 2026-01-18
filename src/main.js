@@ -1,7 +1,7 @@
 import { RealtimeVision } from '@overshoot/sdk'
 import './style.css'
 
-const ERROR_LENGTH_THRESHOLD = 120
+const ERROR_LENGTH_THRESHOLD = 250
 
 document.querySelector('#app').innerHTML = `
   <div class="app-grid">
@@ -194,13 +194,13 @@ Errors may include:
 - Any text indicating failure or invalid behavior
 
 Output rules:
-- If an error is visible, extract the FULL error text exactly as shown.
-- Preserve formatting and line breaks.
+- If an error is visible, extract the FULL error text.
+- Preserve formatting.
 - Do NOT explain or summarize.
 - Do NOT add extra text.
 
 If no error is visible, output exactly:
-NO_ERROR
+Still parsing!
     `,
 
     source: {
