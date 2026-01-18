@@ -1,2 +1,4 @@
 # watchtower
 NexHacks: TheTokenCompany x Overshoot
+
+This project is a minimal Vite + JavaScript demo that streams a recorded video file into Overshoot AI and extracts visible error messages in real time (or returns NO_ERROR if none are detected). To run it, clone the repo, run npm install, create a .env file in the root with VITE_OVERSHOOT_API_URL=https://cluster1.overshoot.ai/api/v0.2 and your VITE_OVERSHOOT_API_KEY, then start the app with npm run dev and open the local URL in Google Chrome. Upload a short MP4 video (H.264 recommended), click Start Overshoot, and check the browser console for outputs; if no output appears, try a different network (such as a hotspot), since some campus Wi-Fi networks block video frame streaming even though the pipeline itself is working.
