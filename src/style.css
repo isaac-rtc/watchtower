@@ -24,8 +24,10 @@ html, body {
   padding: 24px;
   display: flex;
   flex-direction: column;
+  height: 100%; 
   background: white;
 }
+
 
 .container.secondary {
   background: white;
@@ -49,8 +51,10 @@ h4 {
   align-items: center;
   justify-content: center;
   gap: 12px;
+  min-height: 54px;       
   margin-bottom: 16px;
 }
+
 
 .controls input[type="file"] {
   width: auto;
@@ -60,6 +64,7 @@ h4 {
 /* Buttons */
 button {
   padding: 8px 14px;
+  height: 38px;           
   border-radius: 6px;
   border: none;
   font-weight: 600;
@@ -79,7 +84,6 @@ button {
 #compress {
   background: #FFD166;
   color: #0B132B;
-  margin-bottom: 12px;
 }
 
 button:disabled {
@@ -104,11 +108,6 @@ pre {
   overflow-y: auto;
 }
 
-/* Right panel ordering */
-.container.secondary h3 { order: 1; }
-.container.secondary h4 { order: 2; }
-.container.secondary #compress { order: 3; }
-.container.secondary pre { order: 4; }
 
 /* Modal */
 .modal {
